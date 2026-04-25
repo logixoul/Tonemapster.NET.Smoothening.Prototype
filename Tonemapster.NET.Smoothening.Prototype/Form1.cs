@@ -93,8 +93,9 @@ namespace Tonemapster.NET.Smoothening.Prototype
                 return;
             }
 
-            using Mat preview = CreatePreviewImage(loadedImage, trackBarSmoothing.Value);
-            using Mat displayImage = CreateDisplayImage(preview, IsHdrFile(loadedImagePath ?? string.Empty));
+            bool isHdrImage = IsHdrFile(loadedImagePath ?? string.Empty);
+            using Mat preview = CreatePreviewImage(loadedImage, trackBarSmoothing.Value, isHdrImage);
+            using Mat displayImage = CreateDisplayImage(preview, isHdrImage);
             Bitmap bitmap = MatToBitmap(displayImage);
 
             Image? previousImage = pictureBoxPreview.Image;
@@ -103,20 +104,20 @@ namespace Tonemapster.NET.Smoothening.Prototype
             Text = $"{Path.GetFileName(loadedImagePath)} - Preview";
         }
 
-        private static Mat CreatePreviewImage(Mat image, int strength)
+        private static Mat CreatePreviewImage(Mat image, int strength, bool isHdrImage)
         {
+            using Mat workingImage = isHdrImage ? CreateLogTonemappedImage(image) : image.Clone();
+
             if (strength <= 0)
             {
-                return image.Clone();
+                return workingImage.Clone();
             }
 
             Mat filtered = new();
             double sigmaSpatial = 10 + (strength * 2);
-            double sigmaColor = Math.Max(0.01, strength / 20.0);
+            double sigmaColor = 1.2;
 
-            Debug.WriteLine($"Applying DTFilter with sigmaSpatial={sigmaSpatial} and sigmaColor={sigmaColor}");
-            CvXImgProc.DTFilter(image, image, filtered, sigmaSpatial, sigmaColor, EdgeAwareFiltersList.DTF_RF, 3);
-            Debug.WriteLine($"Applied DTFilter with sigmaSpatial={sigmaSpatial} and sigmaColor={sigmaColor}");
+            CvXImgProc.DTFilter(workingImage, workingImage, filtered, sigmaSpatial, sigmaColor, EdgeAwareFiltersList.DTF_RF, 3);
             return filtered;
         }
 
@@ -172,14 +173,10 @@ namespace Tonemapster.NET.Smoothening.Prototype
         {
             if (isHdrImage)
             {
-                using Mat hdrWithEpsilon = new();
-                using Mat logImage = new();
                 using Mat normalized = new();
                 Mat display = new();
 
-                Cv2.Add(image, Scalar.All(1e-6), hdrWithEpsilon);
-                Cv2.Log(hdrWithEpsilon, logImage);
-                Cv2.Normalize(logImage, normalized, 0, 255, NormTypes.MinMax);
+                Cv2.Normalize(image, normalized, 0, 255, NormTypes.MinMax);
                 normalized.ConvertTo(display, MatType.CV_8UC3);
                 return display;
             }
@@ -187,6 +184,16 @@ namespace Tonemapster.NET.Smoothening.Prototype
             Mat rawDisplay = new();
             image.ConvertTo(rawDisplay, MatType.CV_8UC3, 255.0);
             return rawDisplay;
+        }
+
+        private static Mat CreateLogTonemappedImage(Mat image)
+        {
+            using Mat hdrWithEpsilon = new();
+            Mat logImage = new();
+
+            Cv2.Add(image, Scalar.All(1e-6), hdrWithEpsilon);
+            Cv2.Log(hdrWithEpsilon, logImage);
+            return logImage;
         }
 
         private static Mat EnsureThreeChannels(Mat source)
