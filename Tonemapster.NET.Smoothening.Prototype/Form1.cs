@@ -11,6 +11,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
     {
         private static readonly string[] HdrExtensions = [".hdr"];
         private const int TargetPixelCount = 700_000;
+        private const int PercentileHistogramBinCount = 4096;
         private const double LuminanceEpsilon = 1e-6;
         private const double SigmaColorMin = 0.01;
         private const double SigmaColorMax = 10.0;
@@ -55,8 +56,8 @@ namespace Tonemapster.NET.Smoothening.Prototype
         private void LoadImage(string filePath)
         {
             using Mat sourceImage = IsHdrFile(filePath)
-                ? LoadHdrImage(filePath)
-                : LoadRawImage(filePath);
+                ? Form1Helpers.LoadHdrImage(filePath)
+                : Form1Helpers.LoadRawImage(filePath);
 
             Mat image = DownscaleToTargetPixelCount(sourceImage, TargetPixelCount);
 
@@ -108,10 +109,9 @@ namespace Tonemapster.NET.Smoothening.Prototype
                 return;
             }
 
-            bool isHdrImage = IsHdrFile(loadedImagePath ?? string.Empty);
             using Mat preview = CreatePreviewImage(loadedImage, trackBarSmoothing.Value, GetDetailBoost(), GetSigmaColor());
-            using Mat displayImage = CreateDisplayImage(preview, isHdrImage);
-            Bitmap bitmap = MatToBitmap(displayImage);
+            using Mat displayImage = CreateDisplayImage(preview);
+            Bitmap bitmap = Form1Helpers.MatToBitmap(displayImage);
 
             Image? previousImage = pictureBoxPreview.Image;
             pictureBoxPreview.Image = bitmap;
@@ -134,12 +134,12 @@ namespace Tonemapster.NET.Smoothening.Prototype
         {
             using Mat originalLuminance = ComputeLuminance(image);
             using Mat logLuminance = CreateLogLuminance(originalLuminance);
-            using Mat enhancedLogLuminance = strength <= 0
-                ? logLuminance.Clone()
-                : EnhanceLogLuminance(logLuminance, strength, detailBoost, sigmaColor);
+            using Mat enhancedLogLuminance = EnhanceLogLuminance(logLuminance, strength, detailBoost, sigmaColor);
             using Mat enhancedLuminance = new();
-
+            Cv2.Normalize(enhancedLogLuminance, enhancedLogLuminance, 0, 1, NormTypes.MinMax);
             Cv2.Exp(enhancedLogLuminance, enhancedLuminance);
+            ClampToPercentileRangeAndNormalize(enhancedLuminance).CopyTo(enhancedLuminance);
+            
             return ReapplyChroma(image, originalLuminance, enhancedLuminance);
         }
 
@@ -175,55 +175,8 @@ namespace Tonemapster.NET.Smoothening.Prototype
             return resized;
         }
 
-        private static Mat LoadRawImage(string filePath)
+        private static Mat CreateDisplayImage(Mat image)
         {
-            using RawContext raw = RawContext.OpenFile(filePath);
-            raw.Unpack();
-            raw.DcrawProcess(options =>
-            {
-                options.UseCameraWb = true;
-                options.OutputBps = 16;
-                options.OutputTiff = false;
-            });
-
-            using ProcessedImage image = raw.MakeDcrawMemoryImage();
-            return ProcessedImageToMat(image);
-        }
-
-        private static Mat LoadHdrImage(string filePath)
-        {
-            using Mat hdr = Cv2.ImRead(filePath, ImreadModes.AnyColor | ImreadModes.AnyDepth);
-
-            if (hdr.Empty())
-            {
-                throw new InvalidOperationException("Unable to load HDR image.");
-            }
-
-            using Mat colorHdr = EnsureThreeChannels(hdr);
-            Mat floatHdr = new();
-            colorHdr.ConvertTo(floatHdr, MatType.CV_32FC3);
-            return floatHdr;
-        }
-
-        private static Mat CreateDisplayImage(Mat image, bool isHdrImage)
-        {
-            if (isHdrImage)
-            {
-                using Mat originalLuminance = ComputeLuminance(image);
-                using Mat logLuminance = CreateLogLuminance(originalLuminance);
-                using Mat normalizedLogLuminance = new();
-                using Mat displayLuminance = new();
-                using Mat normalizedDisplayLuminance = new();
-                Mat display = new();
-
-                Cv2.Normalize(logLuminance, normalizedLogLuminance, 0, 1, NormTypes.MinMax);
-                Cv2.Exp(normalizedLogLuminance, displayLuminance);
-                Cv2.Normalize(displayLuminance, normalizedDisplayLuminance, 0, 1, NormTypes.MinMax);
-                using Mat chromaPreservedDisplay = ReapplyChroma(image, originalLuminance, normalizedDisplayLuminance);
-                chromaPreservedDisplay.ConvertTo(display, MatType.CV_8UC3, 255.0);
-                return display;
-            }
-
             Mat rawDisplay = new();
             image.ConvertTo(rawDisplay, MatType.CV_8UC3, 255.0);
             return rawDisplay;
@@ -237,6 +190,93 @@ namespace Tonemapster.NET.Smoothening.Prototype
             Cv2.Add(luminance, Scalar.All(LuminanceEpsilon), safeLuminance);
             Cv2.Log(safeLuminance, logImage);
             return logImage;
+        }
+
+        private static Mat ClampToPercentileRangeAndNormalize(Mat image)
+        {
+            if (image.Empty())
+            {
+                throw new ArgumentException("Image must not be empty.", nameof(image));
+            }
+
+            if (image.Type() != MatType.CV_32FC1)
+            {
+                throw new ArgumentException("Expected a single-channel CV_32FC1 image.", nameof(image));
+            }
+
+            Cv2.MinMaxLoc(image, out double minValue, out double maxValue);
+
+            if (maxValue <= minValue)
+            {
+                return new Mat(image.Size(), MatType.CV_32FC1, Scalar.All(0));
+            }
+
+            float histogramMin = (float)minValue;
+            float histogramMax = (float)maxValue;
+            if (histogramMax <= histogramMin)
+            {
+                histogramMax = histogramMin + 1e-6f;
+            }
+
+            using Mat histogram = new();
+            Cv2.CalcHist(
+                [image],
+                [0],
+                null,
+                histogram,
+                1,
+                [PercentileHistogramBinCount],
+                [new Rangef(histogramMin, histogramMax)],
+                true,
+                false);
+
+            double totalPixelCount = image.Total();
+            double lowerTargetCount = totalPixelCount * 0.01;
+            double upperTargetCount = totalPixelCount * 0.99;
+            double binWidth = (histogramMax - histogramMin) / PercentileHistogramBinCount;
+
+            double GetPercentileValue(double targetCount)
+            {
+                double cumulativeCount = 0;
+
+                for (int i = 0; i < PercentileHistogramBinCount; i++)
+                {
+                    float binCount = histogram.Get<float>(i);
+                    double nextCumulativeCount = cumulativeCount + binCount;
+
+                    if (nextCumulativeCount >= targetCount)
+                    {
+                        double fraction = binCount > 0
+                            ? (targetCount - cumulativeCount) / binCount
+                            : 0;
+                        fraction = Math.Clamp(fraction, 0, 1);
+                        return histogramMin + ((i + fraction) * binWidth);
+                    }
+
+                    cumulativeCount = nextCumulativeCount;
+                }
+
+                return histogramMax;
+            }
+
+            double lowerValue = GetPercentileValue(lowerTargetCount);
+            double upperValue = GetPercentileValue(upperTargetCount);
+
+            if (upperValue <= lowerValue)
+            {
+                return new Mat(image.Size(), MatType.CV_32FC1, Scalar.All(0));
+            }
+
+            Mat clamped = image.Clone();
+            using Mat lowerBound = new(image.Size(), MatType.CV_32FC1, Scalar.All(lowerValue));
+            using Mat upperBound = new(image.Size(), MatType.CV_32FC1, Scalar.All(upperValue));
+
+            Cv2.Max(clamped, lowerBound, clamped);
+            Cv2.Min(clamped, upperBound, clamped);
+
+            Cv2.Subtract(clamped, Scalar.All(lowerValue), clamped);
+            Cv2.Multiply(clamped, Scalar.All(1.0 / (upperValue - lowerValue)), clamped);
+            return clamped;
         }
 
         private static Mat ComputeLuminance(Mat image)
@@ -278,75 +318,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
             return output;
         }
 
-        private static Mat EnsureThreeChannels(Mat source)
-        {
-            Mat destination = new();
-
-            switch (source.Channels())
-            {
-                case 1:
-                    Cv2.CvtColor(source, destination, ColorConversionCodes.GRAY2BGR);
-                    break;
-                case 3:
-                    source.CopyTo(destination);
-                    break;
-                case 4:
-                    Cv2.CvtColor(source, destination, ColorConversionCodes.BGRA2BGR);
-                    break;
-                default:
-                    throw new NotSupportedException("Unsupported image channel count.");
-            }
-
-            return destination;
-        }
-
-        private static Bitmap MatToBitmap(Mat mat)
-        {
-            Bitmap bitmap = new(mat.Width, mat.Height, PixelFormat.Format24bppRgb);
-            Rectangle bounds = new(0, 0, bitmap.Width, bitmap.Height);
-            BitmapData bitmapData = bitmap.LockBits(bounds, ImageLockMode.WriteOnly, bitmap.PixelFormat);
-
-            try
-            {
-                int srcStride = (int)mat.Step();
-                int rowLength = mat.Width * mat.ElemSize();
-                byte[] rowBuffer = new byte[rowLength];
-
-                for (int y = 0; y < mat.Height; y++)
-                {
-                    Marshal.Copy(IntPtr.Add(mat.Data, y * srcStride), rowBuffer, 0, rowLength);
-                    Marshal.Copy(rowBuffer, 0, IntPtr.Add(bitmapData.Scan0, y * bitmapData.Stride), rowLength);
-                }
-            }
-            finally
-            {
-                bitmap.UnlockBits(bitmapData);
-            }
-
-            return bitmap;
-        }
-
-        private static Mat ProcessedImageToMat(ProcessedImage rgbImage)
-        {
-            if (rgbImage.Bits != 16)
-            {
-                throw new NotSupportedException($"Expected 16-bit RAW output, but got {rgbImage.Bits}-bit.");
-            }
-
-            using Mat rawMat = Mat.FromPixelData(
-                rgbImage.Height,
-                rgbImage.Width,
-                MatType.CV_16UC3,
-                rgbImage.DataPointer,
-                rgbImage.Width * rgbImage.Channels * sizeof(ushort));
-
-            Mat floatMat = new();
-            Mat bgrFloatMat = new();
-            rawMat.ConvertTo(floatMat, MatType.CV_32FC3, 1.0 / ushort.MaxValue);
-            Cv2.CvtColor(floatMat, bgrFloatMat, ColorConversionCodes.RGB2BGR);
-            floatMat.Dispose();
-            return bgrFloatMat;
-        }
+        
 
         private void DisposeLoadedImage()
         {
