@@ -77,7 +77,7 @@
             trackBarSigmaColor.Size = new Size(671, 45);
             trackBarSigmaColor.TabIndex = 5;
             trackBarSigmaColor.TickFrequency = 30;
-            trackBarSigmaColor.Value = 200;
+            trackBarSigmaColor.Value = 100;
             trackBarSigmaColor.Scroll += HandleSigmaColorScroll;
             // 
             // labelSigmaColor
@@ -85,20 +85,20 @@
             labelSigmaColor.AutoSize = true;
             labelSigmaColor.Location = new Point(12, 117);
             labelSigmaColor.Name = "labelSigmaColor";
-            labelSigmaColor.Size = new Size(93, 15);
+            labelSigmaColor.Size = new Size(72, 15);
             labelSigmaColor.TabIndex = 4;
-            labelSigmaColor.Text = "Sigma Color: 1.0";
+            labelSigmaColor.Text = "Sigma Color";
             // 
             // trackBarDetailBoost
             // 
             trackBarDetailBoost.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             trackBarDetailBoost.Location = new Point(117, 60);
-            trackBarDetailBoost.Maximum = 5000;
+            trackBarDetailBoost.Maximum = 50;
             trackBarDetailBoost.Name = "trackBarDetailBoost";
             trackBarDetailBoost.Size = new Size(671, 45);
             trackBarDetailBoost.TabIndex = 3;
             trackBarDetailBoost.TickFrequency = 50;
-            trackBarDetailBoost.Value = 40;
+            trackBarDetailBoost.Value = 16;
             trackBarDetailBoost.Scroll += HandleDetailBoostScroll;
             // 
             // labelDetailBoost
@@ -106,9 +106,9 @@
             labelDetailBoost.AutoSize = true;
             labelDetailBoost.Location = new Point(12, 69);
             labelDetailBoost.Name = "labelDetailBoost";
-            labelDetailBoost.Size = new Size(91, 15);
+            labelDetailBoost.Size = new Size(70, 15);
             labelDetailBoost.TabIndex = 2;
-            labelDetailBoost.Text = "Detail Boost: 4.0";
+            labelDetailBoost.Text = "Detail Boost";
             // 
             // trackBarSmoothing
             // 
