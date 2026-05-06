@@ -5,8 +5,66 @@ using System.Runtime.InteropServices;
 
 namespace Tonemapster.NET.Smoothening.Prototype
 {
-    internal static class Form1Helpers
+    internal static class Helpers
     {
+        public static float[,] ToFloatArray2DFast(Mat mat)
+        {
+            if (mat.Empty())
+                throw new ArgumentException("Mat is empty.", nameof(mat));
+
+            if (mat.Type() != MatType.CV_32FC1)
+                throw new ArgumentException($"Expected CV_32FC1, got {mat.Type()}.", nameof(mat));
+
+            int rows = mat.Rows;
+            int cols = mat.Cols;
+            float[,] result = new float[rows, cols];
+
+            if (!mat.IsContinuous())
+                mat = mat.Clone();
+
+            unsafe
+            {
+                byte* basePtr = (byte*)mat.DataPointer;
+
+                for (int y = 0; y < rows; y++)
+                {
+                    float[] row = new float[cols];
+                    IntPtr rowPtr = (IntPtr)(basePtr + y * mat.Step());
+                    Marshal.Copy(rowPtr, row, 0, cols);
+
+                    for (int x = 0; x < cols; x++)
+                    {
+                        result[y, x] = row[x];
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        public static Mat ToMatFast(float[,] values)
+        {
+            if (values is null)
+                throw new ArgumentNullException(nameof(values));
+
+            int rows = values.GetLength(0);
+            int cols = values.GetLength(1);
+            Mat mat = new(rows, cols, MatType.CV_32FC1);
+
+            for (int y = 0; y < rows; y++)
+            {
+                float[] row = new float[cols];
+                for (int x = 0; x < cols; x++)
+                {
+                    row[x] = values[y, x];
+                }
+
+                IntPtr rowPtr = IntPtr.Add(mat.Data, checked((int)(y * mat.Step())));
+                Marshal.Copy(row, 0, rowPtr, cols);
+            }
+
+            return mat;
+        }
 
         public static Mat EnsureThreeChannels(Mat source)
         {

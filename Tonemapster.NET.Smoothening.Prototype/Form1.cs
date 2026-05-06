@@ -2,6 +2,7 @@ using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using OpenCvSharp;
 using Sdcb.LibRaw;
+using UMapx.Transform;
 
 namespace Tonemapster.NET.Smoothening.Prototype
 {
@@ -10,10 +11,9 @@ namespace Tonemapster.NET.Smoothening.Prototype
         private static readonly string[] HdrExtensions = [".hdr"];
         private const int TargetPixelCount = 700_000;
         private const double LuminanceEpsilon = 1e-6;
-        private const double SigmaColorMin = 0.01;
-        private const double SigmaColorMax = 10.0;
         private Mat? loadedImage;
         private string? loadedImagePath;
+        private readonly LocalLaplacianFilter llf;
 
         public Form1()
         {
@@ -24,6 +24,8 @@ namespace Tonemapster.NET.Smoothening.Prototype
             {
                 LoadImage(initialImagePath);
             }
+
+            llf = new LocalLaplacianFilter();
         }
 
         private void HandleDragEnter(object? sender, DragEventArgs e)
@@ -53,8 +55,8 @@ namespace Tonemapster.NET.Smoothening.Prototype
         private void LoadImage(string filePath)
         {
             using Mat sourceImage = IsHdrFile(filePath)
-                ? Form1Helpers.LoadHdrImage(filePath)
-                : Form1Helpers.LoadRawImage(filePath);
+                ? Helpers.LoadHdrImage(filePath)
+                : Helpers.LoadRawImage(filePath);
 
             Mat image = DownscaleToTargetPixelCount(sourceImage, TargetPixelCount);
 
@@ -107,7 +109,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
         private double GetSigmaColor()
         {
             double position = (double)trackBarSigmaColor.Value / trackBarSigmaColor.Maximum;
-            return SigmaColorMin * Math.Pow(SigmaColorMax / SigmaColorMin, position);
+            return position;
         }
 
         private void ApplySmoothing()
@@ -117,9 +119,9 @@ namespace Tonemapster.NET.Smoothening.Prototype
                 return;
             }
 
-            using Mat preview = MultiscaleTonemapper.CreateTonemappedImage(loadedImage, trackBarSmoothing.Value, GetDetailBoost(), GetSigmaColor());
+            using Mat preview = LlfTonemapper.CreateTonemappedImage(loadedImage, trackBarSmoothing.Value, GetDetailBoost(), GetSigmaColor());
             using Mat displayImage = CreateDisplayImage(preview);
-            Bitmap bitmap = Form1Helpers.MatToBitmap(displayImage);
+            Bitmap bitmap = Helpers.MatToBitmap(displayImage);
 
             Image? previousImage = pictureBoxPreview.Image;
             pictureBoxPreview.Image = bitmap;

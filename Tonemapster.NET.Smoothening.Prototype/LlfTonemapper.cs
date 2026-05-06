@@ -1,12 +1,14 @@
 using System.Diagnostics;
 using OpenCvSharp;
 using OpenCvSharp.XImgProc;
+using UMapx.Transform;
 
 namespace Tonemapster.NET.Smoothening.Prototype
 {
-    internal static class MultiscaleTonemapper
+    internal static class LlfTonemapper
     {
         private const double LuminanceEpsilon = 1e-6;
+        private static readonly LocalLaplacianFilter llf = new LocalLaplacianFilter();
 
         public static Mat CreateTonemappedImage(Mat image, int strength, double detailBoost, double sigmaColor)
         {
@@ -23,52 +25,26 @@ namespace Tonemapster.NET.Smoothening.Prototype
 
         public static Mat EnhanceDetails(Mat input, int strength, double detailBoost, double sigmaColor)
         {
-            const int layerCount = 7;
-            double baseSigmaSpatial = 1.0;
-            List<Mat> detailLayers = new(layerCount);
-            Mat currentBase = input.Clone();
+            using Mat inputNormalized = new();
+            Cv2.Normalize(input, inputNormalized, 0, 1, NormTypes.MinMax);
+            var inputArr = Helpers.ToFloatArray2DFast(inputNormalized);
+            //llf.Factor = (float)detailBoost*1000;
+            //llf.Radius = strength;
+            llf.Sigma = (float)sigmaColor;
 
-            try
-            {
-                for (int i = 0; i < layerCount; i++)
-                {
-                    double sigmaSpatial = baseSigmaSpatial * Math.Pow(2, i);
-                    Mat nextBase = new();
-                    Mat detailLayer = new();
-
-                    Debug.WriteLine($"Applying edge-aware filter layer {i + 1}/{layerCount} with sigmaSpatial={sigmaSpatial}, sigmaColor={sigmaColor}");
-                    CvXImgProc.DTFilter(currentBase, currentBase, nextBase, sigmaSpatial, sigmaColor, EdgeAwareFiltersList.DTF_RF, 3);
-                    Cv2.Subtract(currentBase, nextBase, detailLayer);
-                    detailLayers.Add(detailLayer);
-
-                    currentBase.Dispose();
-                    currentBase = nextBase;
-                }
-
-                Mat recomposed = currentBase.Clone();
-
-                float layerIndex = 0;
-                foreach (Mat detailLayer in detailLayers)
-                {
-                    layerIndex++;
-                    using Mat boostedDetailLayer = new();
-                    double layerWeight = detailBoost * 10 * Math.Pow(0.7, layerIndex);
-
-                    Cv2.Multiply(detailLayer, layerWeight, boostedDetailLayer);
-                    Cv2.Add(recomposed, boostedDetailLayer, recomposed);
-                }
-
-                return recomposed;
-            }
-            finally
-            {
-                currentBase.Dispose();
-
-                foreach (Mat detailLayer in detailLayers)
-                {
-                    detailLayer.Dispose();
-                }
-            }
+            //llf.Radius = 2;
+            llf.Radius = strength*2;
+            //llf.Sigma = 0.05f;
+            llf.N = 20;
+            llf.Levels = 2000;
+            llf.Factor = (float)detailBoost*30.0f;
+            llf.Apply(inputArr);
+            Debug.WriteLine("llf.Radius = " + llf.Radius + ";");
+            Debug.WriteLine("llf.Sigma = " + llf.Sigma + ";");
+            Debug.WriteLine("llf.N = " + llf.N + ";");
+            Debug.WriteLine("llf.Levels = " + llf.Levels + ";");
+            Debug.WriteLine("llf.Factor = " + llf.Factor + ";");
+            return Helpers.ToMatFast(inputArr);
         }
 
         public static Mat CreateLogLuminance(Mat luminance)

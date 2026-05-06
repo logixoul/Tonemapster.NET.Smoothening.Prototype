@@ -72,12 +72,12 @@
             // 
             trackBarSigmaColor.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             trackBarSigmaColor.Location = new Point(117, 108);
-            trackBarSigmaColor.Maximum = 300;
+            trackBarSigmaColor.Maximum = 100;
             trackBarSigmaColor.Name = "trackBarSigmaColor";
             trackBarSigmaColor.Size = new Size(671, 45);
             trackBarSigmaColor.TabIndex = 5;
             trackBarSigmaColor.TickFrequency = 30;
-            trackBarSigmaColor.Value = 100;
+            trackBarSigmaColor.Value = 5;
             trackBarSigmaColor.Scroll += HandleSigmaColorScroll;
             // 
             // labelSigmaColor
@@ -119,6 +119,7 @@
             trackBarSmoothing.Size = new Size(686, 45);
             trackBarSmoothing.TabIndex = 1;
             trackBarSmoothing.TickFrequency = 10;
+            trackBarSmoothing.Value = 2;
             trackBarSmoothing.Scroll += HandleSmoothingStrengthScroll;
             trackBarSmoothing.MouseCaptureChanged += HandleSmoothingStrengthMouseCaptureChanged;
             trackBarSmoothing.MouseUp += HandleSmoothingStrengthMouseUp;
