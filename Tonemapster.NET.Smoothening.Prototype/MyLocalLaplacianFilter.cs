@@ -14,7 +14,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
     /// https://people.csail.mit.edu/sparis/publi/2011/siggraph/
     /// </remarks>
     [Serializable]
-    public class MyLocalLaplacianFilter : IFilter
+    public class MyLocalLaplacianFilter
     {
         #region Private data
         /// <summary>
@@ -137,30 +137,6 @@ namespace Tonemapster.NET.Smoothening.Prototype
         {
             Llfilter(data, this.radius, this.sigma, this.factor, this.n, this.levels);
         }
-        /// <summary>
-        /// Apply filter.
-        /// </summary>
-        /// <param name="data">Matrix</param>
-        public void Apply(float[] data)
-        {
-            Llfilter(data, this.radius, this.sigma, this.factor, this.n, this.levels);
-        }
-        /// <summary>
-        /// Apply filter.
-        /// </summary>
-        /// <param name="data">Matrix</param>
-        public void Apply(Complex32[,] data)
-        {
-            throw new NotSupportedException();
-        }
-        /// <summary>
-        /// Apply filter.
-        /// </summary>
-        /// <param name="data">Matrix</param>
-        public void Apply(Complex32[] data)
-        {
-            throw new NotSupportedException();
-        }
         #endregion
 
         #region Private voids
@@ -264,81 +240,6 @@ namespace Tonemapster.NET.Smoothening.Prototype
                 }
             }
         }
-        /// <summary>
-        /// Local laplacian filter.
-        /// </summary>
-        /// <param name="input">Input data</param>
-        /// <param name="radius">Radius</param>
-        /// <param name="sigma">Sigma</param>
-        /// <param name="factor">Factor</param>
-        /// <param name="n">Number of steps</param>
-        /// <param name="levels">Levels</param>
-        private static void Llfilter(float[] input, int radius, float sigma, float factor, int n, int levels)
-        {
-            // exception
-            if (factor == 0)
-                return;
-
-            // data
-            int height = input.GetLength(0);
-            int y, level, length = 256;
-            float step = 1.0f / n;
-            float min = 0.0f, max = 1.0f;
-
-            // pyramids
-            int n_levels = (int)Math.Min((Math.Log(height) / Math.Log(2)), levels);
-            MyLaplacianPyramidTransform lpt = new MyLaplacianPyramidTransform(n_levels, radius);
-            MyGaussianPyramidTransform gpt = new MyGaussianPyramidTransform(n_levels, radius);
-
-            float[][] input_gaussian_pyr = gpt.Forward(input);
-            float[][] output_laplace_pyr = lpt.Forward(input_gaussian_pyr);
-            float[][] temp_laplace_pyr;
-            float[] I_temp, I_gaus, I_outp;
-            float[] T;
-
-            // do job
-            for (float i = min; i <= max; i += step)
-            {
-                height = input.GetLength(0);
-                I_temp = new float[height];
-                T = Rem(sigma, factor, i, length);
-
-                // remapping function
-                for (y = 0; y < height; y++)
-                {
-                    I_temp[y] = T[Maths.Byte(input[y] * (length - 1))];
-                }
-
-                temp_laplace_pyr = lpt.Forward(I_temp);
-                T = Rec(i, step, length);
-
-                // pyramid reconstruction
-                for (level = 0; level < n_levels; level++)
-                {
-                    I_gaus = input_gaussian_pyr[level];
-                    I_temp = temp_laplace_pyr[level];
-                    I_outp = output_laplace_pyr[level];
-                    height = I_outp.GetLength(0);
-
-                    for (y = 0; y < height; y++)
-                    {
-                        I_outp[y] += T[Maths.Byte(I_gaus[y] * (length - 1))] * I_temp[y];
-                    }
-
-                    output_laplace_pyr[level] = I_outp;
-                }
-            }
-
-            // backward transform
-            I_outp = lpt.Backward(output_laplace_pyr);
-            height = input.GetLength(0);
-
-            for (y = 0; y < height; y++)
-            {
-                input[y] = I_outp[y];
-            }
-        }
-
         /// <summary>
         /// Reconstruct function.
         /// </summary>

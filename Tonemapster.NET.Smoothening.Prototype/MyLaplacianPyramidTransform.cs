@@ -14,7 +14,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
     /// http://www.cs.toronto.edu/~jepson/csc320/notes/pyramids.pdf
     /// </remarks>
     [Serializable]
-    public class MyLaplacianPyramidTransform : IPyramidTransform
+    public class MyLaplacianPyramidTransform
     {
         #region Private data
         int radius;
@@ -105,29 +105,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
             lapl[nlev - 1] = J;
             return lapl;
         }
-        /// <summary>
-        /// Forward Laplacian pyramid transform.
-        /// </summary>
-        /// <param name="data">Array</param>
-        /// <returns>Pyramid</returns>
-        public float[][] Forward(float[] data)
-        {
-            int r = data.Length;
-            int nlev = (int)Math.Min((Math.Log(r) / Math.Log(2)), levels);
-
-            float[][] lapl = new float[nlev][];
-            float[] I, J = data;
-
-            for (int i = 0; i < nlev - 1; i++)
-            {
-                I = MyGaussianPyramidTransform.Downsample(J, this.radius);
-                lapl[i] = MyGaussianPyramidTransform.Sub(J, MyGaussianPyramidTransform.Upsample(I, this.radius));
-                J = I;
-            }
-
-            lapl[nlev - 1] = J;
-            return lapl;
-        }
+        
         /// <summary>
         /// Backward Laplacian pyramid transform.
         /// </summary>
@@ -137,102 +115,6 @@ namespace Tonemapster.NET.Smoothening.Prototype
         {
             int nlev = pyramid.Length - 1;
             float[,] I = pyramid[nlev];
-
-            for (int i = nlev - 1; i >= 0; i--)
-            {
-                I = MyGaussianPyramidTransform.Add(pyramid[i], MyGaussianPyramidTransform.Upsample(I, this.radius));
-            }
-
-            return I;
-        }
-        /// <summary>
-        /// Backward Laplacian pyramid transform.
-        /// </summary>
-        /// <param name="pyramid">Pyramid</param>
-        /// <returns>Array</returns>
-        public float[] Backward(float[][] pyramid)
-        {
-            int nlev = pyramid.Length;
-            float[] I = pyramid[nlev];
-
-            for (int i = nlev - 1; i >= 0; i--)
-            {
-                I = MyGaussianPyramidTransform.Add(pyramid[i], MyGaussianPyramidTransform.Upsample(I, this.radius));
-            }
-
-            return I;
-        }
-        /// <summary>
-        /// Forward Laplacian pyramid transform.
-        /// </summary>
-        /// <param name="data">Matrix</param>
-        /// <returns>Pyramid</returns>
-        public Complex32[][,] Forward(Complex32[,] data)
-        {
-            int r = data.GetLength(0), c = data.GetLength(1);
-            int nlev = (int)Math.Min((Math.Log(Math.Min(r, c)) / Math.Log(2)), levels);
-            Complex32[][,] lapl = new Complex32[nlev][,];
-            Complex32[,] I, J = data;
-
-            for (int i = 0; i < nlev - 1; i++)
-            {
-                I = MyGaussianPyramidTransform.Downsample(J, this.radius);
-                lapl[i] = MyGaussianPyramidTransform.Sub(J, MyGaussianPyramidTransform.Upsample(I, this.radius));
-                J = I;
-            }
-
-            lapl[nlev - 1] = J;
-            return lapl;
-        }
-        /// <summary>
-        /// Forward Laplacian pyramid transform.
-        /// </summary>
-        /// <param name="data">Array</param>
-        /// <returns>Pyramid</returns>
-        public Complex32[][] Forward(Complex32[] data)
-        {
-            int r = data.Length;
-            int nlev = (int)Math.Min((Math.Log(r) / Math.Log(2)), levels);
-
-            Complex32[][] lapl = new Complex32[nlev][];
-            Complex32[] I, J = data;
-
-            for (int i = 0; i < nlev - 1; i++)
-            {
-                I = MyGaussianPyramidTransform.Downsample(J, this.radius);
-                lapl[i] = MyGaussianPyramidTransform.Sub(J, MyGaussianPyramidTransform.Upsample(I, this.radius));
-                J = I;
-            }
-
-            lapl[nlev - 1] = J;
-            return lapl;
-        }
-        /// <summary>
-        /// Backward Laplacian pyramid transform.
-        /// </summary>
-        /// <param name="pyramid">Pyramid</param>
-        /// <returns>Matrix</returns>
-        public Complex32[,] Backward(Complex32[][,] pyramid)
-        {
-            int nlev = pyramid.Length - 1;
-            Complex32[,] I = pyramid[nlev];
-
-            for (int i = nlev - 1; i >= 0; i--)
-            {
-                I = MyGaussianPyramidTransform.Add(pyramid[i], MyGaussianPyramidTransform.Upsample(I, this.radius));
-            }
-
-            return I;
-        }
-        /// <summary>
-        /// Backward Laplacian pyramid transform.
-        /// </summary>
-        /// <param name="pyramid">Pyramid</param>
-        /// <returns>Array</returns>
-        public Complex32[] Backward(Complex32[][] pyramid)
-        {
-            int nlev = pyramid.Length;
-            Complex32[] I = pyramid[nlev];
 
             for (int i = nlev - 1; i >= 0; i--)
             {
@@ -262,60 +144,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
             lapl[nlev - 1] = data[nlev - 1];
             return lapl;
         }
-        /// <summary>
-        /// Forward Laplacian pyramid transform.
-        /// </summary>
-        /// <param name="data">Gaussian pyramid</param>
-        /// <returns>Pyramid</returns>
-        public float[][] Forward(float[][] data)
-        {
-            int nlev = data.Length;
-            float[][] lapl = new float[nlev][];
-
-            for (int i = 1; i < nlev; i++)
-            {
-                lapl[i - 1] = MyGaussianPyramidTransform.Sub(data[i - 1], MyGaussianPyramidTransform.Upsample(data[i], this.radius));
-            }
-
-            lapl[nlev - 1] = data[nlev - 1];
-            return lapl;
-        }
-        /// <summary>
-        /// Forward Laplacian pyramid transform.
-        /// </summary>
-        /// <param name="data">Gaussian pyramid</param>
-        /// <returns>Pyramid</returns>
-        public Complex32[][,] Forward(Complex32[][,] data)
-        {
-            int nlev = data.Length;
-            Complex32[][,] lapl = new Complex32[nlev][,];
-
-            for (int i = 1; i < nlev; i++)
-            {
-                lapl[i - 1] = MyGaussianPyramidTransform.Sub(data[i - 1], MyGaussianPyramidTransform.Upsample(data[i], this.radius));
-            }
-
-            lapl[nlev - 1] = data[nlev - 1];
-            return lapl;
-        }
-        /// <summary>
-        /// Forward Laplacian pyramid transform.
-        /// </summary>
-        /// <param name="data">Gaussian pyramid</param>
-        /// <returns>Pyramid</returns>
-        public Complex32[][] Forward(Complex32[][] data)
-        {
-            int nlev = data.Length;
-            Complex32[][] lapl = new Complex32[nlev][];
-
-            for (int i = 1; i < nlev; i++)
-            {
-                lapl[i - 1] = MyGaussianPyramidTransform.Sub(data[i - 1], MyGaussianPyramidTransform.Upsample(data[i], this.radius));
-            }
-
-            lapl[nlev - 1] = data[nlev - 1];
-            return lapl;
-        }
+        
         #endregion
     }
 }
