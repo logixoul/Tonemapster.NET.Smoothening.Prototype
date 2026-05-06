@@ -9,7 +9,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
     public partial class Form1 : Form
     {
         private static readonly string[] HdrExtensions = [".hdr"];
-        private const int TargetPixelCount = 700_000;
+        private const int TargetPixelCount = 1400_000;
         private const double LuminanceEpsilon = 1e-6;
         private Mat? loadedImage;
         private string? loadedImagePath;

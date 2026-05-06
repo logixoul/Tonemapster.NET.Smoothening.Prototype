@@ -1,14 +1,12 @@
 using System.Diagnostics;
 using OpenCvSharp;
-using OpenCvSharp.XImgProc;
-using UMapx.Transform;
 
 namespace Tonemapster.NET.Smoothening.Prototype
 {
     internal static class LlfTonemapper
     {
         private const double LuminanceEpsilon = 1e-6;
-        private static readonly LocalLaplacianFilter llf = new LocalLaplacianFilter();
+        private static readonly MyLocalLaplacianFilter llf = new MyLocalLaplacianFilter();
 
         public static Mat CreateTonemappedImage(Mat image, int strength, double detailBoost, double sigmaColor)
         {
@@ -33,7 +31,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
             llf.Sigma = (float)sigmaColor;
 
             //llf.Radius = 2;
-            llf.Radius = strength*2;
+            llf.Radius = strength;
             //llf.Sigma = 0.05f;
             llf.N = 20;
             llf.Levels = 2000;
