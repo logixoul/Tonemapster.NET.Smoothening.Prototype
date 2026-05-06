@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Text;
 using UMapx.Core;
-using UMapx.Transform;
 
 namespace Tonemapster.NET.Smoothening.Prototype
 {
@@ -17,26 +16,8 @@ namespace Tonemapster.NET.Smoothening.Prototype
     public class MyLocalLaplacianFilter
     {
         #region Private data
-        /// <summary>
-        /// Sigma.
-        /// </summary>
         private float sigma;
-        /// <summary>
-        /// Factor.
-        /// </summary>
-        private float factor;
-        /// <summary>
-        /// Number of samples.
-        /// </summary>
         private int n;
-        /// <summary>
-        /// Number of levels.
-        /// </summary>
-        private int levels;
-        /// <summary>
-        /// Radius.
-        /// </summary>
-        private int radius;
         #endregion
 
         #region Filter components
@@ -59,17 +40,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
         /// <summary>
         /// Gets or sets radius.
         /// </summary>
-        public int Radius
-        {
-            get
-            {
-                return this.radius;
-            }
-            set
-            {
-                this.radius = value;
-            }
-        }
+        public int Radius { get; set; }
         /// <summary>
         /// Gets or sets the value of σ-parameter.
         /// </summary>
@@ -87,17 +58,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
         /// <summary>
         /// Gets or sets the factor.
         /// </summary>
-        public float Factor
-        {
-            get
-            {
-                return this.factor;
-            }
-            set
-            {
-                this.factor = value;
-            }
-        }
+        public float Factor { get; set; }
         /// <summary>
         /// Gets or sets the number of samples.
         /// </summary>
@@ -109,23 +70,13 @@ namespace Tonemapster.NET.Smoothening.Prototype
             }
             set
             {
-                this.n = Math.Max(value, 0);
+                this.n = value;
             }
         }
         /// <summary>
         /// Gets or sets the number of levels.
         /// </summary>
-        public int Levels
-        {
-            get
-            {
-                return this.levels;
-            }
-            set
-            {
-                this.levels = value;
-            }
-        }
+        public int Levels { get; set; }
         #endregion
 
         #region Apply voids
@@ -135,7 +86,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
         /// <param name="data">Matrix</param>
         public void Apply(float[,] data)
         {
-            Llfilter(data, this.radius, this.sigma, this.factor, this.n, this.levels);
+            Llfilter(data, this.Radius, this.sigma, this.Factor, this.n, this.Levels);
         }
         #endregion
 
@@ -240,6 +191,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
                 }
             }
         }
+
         /// <summary>
         /// Reconstruct function.
         /// </summary>

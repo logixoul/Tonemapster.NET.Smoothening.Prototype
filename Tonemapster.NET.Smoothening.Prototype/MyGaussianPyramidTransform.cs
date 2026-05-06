@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using global::UMapx.Core;
-using global::UMapx.Transform;
-using System;
 using UMapx.Core;
+using UMapx.Transform;
+using System;
 using UMapx.Visualization;
 
 
@@ -270,7 +269,9 @@ namespace Tonemapster.NET.Smoothening.Prototype
         {
             int r = u.GetLength(0), c = u.GetLength(1);
             int radius = kernel.Length / 2;
-            float[,] v = new float[r, c];
+            float[] uFlat = new float[r * c];
+            Buffer.BlockCopy(u, 0, uFlat, 0, uFlat.Length * sizeof(float));
+            float[] v = new float[r * c];
             float[,] w = new float[r, c];
 
             for (int i = 0; i < r; i++)
@@ -283,21 +284,22 @@ namespace Tonemapster.NET.Smoothening.Prototype
 
                     for (int k = -radius; k <= radius; k++)
                     {
-                        sum += LxFetchElement(u, i, j + k) * kernel[k + radius];
+                        sum += LxFetchElement(uFlat, r, c, i, j + k) * kernel[k + radius];
                     }
 
-                    v[i, j] = sum;
+                    v[i * c + j] = sum;
                 }
+                int iByC = i * c;
                 for (int j = leftEnd; j < rightStart; j++)
                 {
                     float sum = 0;
 
                     for (int k = -radius; k <= radius; k++)
                     {
-                        sum += u[i, j + k] * kernel[k + radius];
+                        sum += uFlat[iByC + (j + k)] * kernel[k + radius];
                     }
 
-                    v[i, j] = sum;
+                    v[iByC + j] = sum;
                 }
                 for (int j = rightStart; j < c; j++)
                 {
@@ -305,10 +307,10 @@ namespace Tonemapster.NET.Smoothening.Prototype
 
                     for (int k = -radius; k <= radius; k++)
                     {
-                        sum += LxFetchElement(u, i, j + k) * kernel[k + radius];
+                        sum += LxFetchElement(uFlat, r, c, i, j + k) * kernel[k + radius];
                     }
 
-                    v[i, j] = sum;
+                    v[iByC + j] = sum;
                 }
             }
 
@@ -322,7 +324,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
 
                     for (int k = -radius; k <= radius; k++)
                     {
-                        sum += LxFetchElement(v, i + k, j) * kernel[k + radius];
+                        sum += LxFetchElement(v, r, c, i + k, j) * kernel[k + radius];
                     }
 
                     w[i, j] = sum;
@@ -330,13 +332,14 @@ namespace Tonemapster.NET.Smoothening.Prototype
             }
             for (int i = topEnd; i < bottomStart; i++)
             {
+                //int scanlineStart = i * c;
                 for (int j = 0; j < c; j++)
                 {
                     float sum = 0;
 
                     for (int k = -radius; k <= radius; k++)
                     {
-                        sum += v[i + k, j] * kernel[k + radius];
+                        sum += v[(i + k) * c + j] * kernel[k + radius];
                     }
 
                     w[i, j] = sum;
@@ -350,7 +353,7 @@ namespace Tonemapster.NET.Smoothening.Prototype
 
                     for (int k = -radius; k <= radius; k++)
                     {
-                        sum += LxFetchElement(v, i + k, j) * kernel[k + radius];
+                        sum += LxFetchElement(v, r, c, i + k, j) * kernel[k + radius];
                     }
 
                     w[i, j] = sum;
@@ -368,6 +371,16 @@ namespace Tonemapster.NET.Smoothening.Prototype
                 return 0;
             }
             return u[i, j];
+            //return u[Clamp(i, r - 1), Clamp(j, c - 1)];
+        }
+
+        private static float LxFetchElement(float[] u, int r, int c, int i, int j)
+        {
+            if (i < 0 || i >= r || j < 0 || j >= c)
+            {
+                return 0;
+            }
+            return u[i * c + j];
             //return u[Clamp(i, r - 1), Clamp(j, c - 1)];
         }
 
